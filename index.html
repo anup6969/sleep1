@@ -250,7 +250,7 @@
         // Formats
         const day = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now);
         const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
-        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); // 1:52 AM
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false }); // 1:52 AM
         const time24 = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); // 01:52 (for graph logic)
 
         const newRecord = {
@@ -317,7 +317,7 @@
           tr.innerHTML = `
             <td class="px-5 py-4 text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">${record.day}</td>
             <td class="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">${record.date}</td>
-            <td class="px-5 py-4 text-sm font-mono font-medium text-indigo-600 dark:text-indigo-400 text-right">${record.time}</td>
+            <td class="px-5 py-4 text-sm font-mono font-medium text-indigo-600 dark:text-indigo-400 text-right">${record.time24}</td>
           `;
           tbody.appendChild(tr);
         });
