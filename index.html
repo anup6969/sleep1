@@ -91,6 +91,20 @@
 
       <!-- AI & Charts Section (Hidden if no data) -->
       <section id="insightsSection" class="hidden space-y-6 animate-slide-up">
+
+        <!-- History List -->
+      <section id="historySection" class="hidden animate-slide-up" style="animation-delay: 150ms;">
+        <div class="flex items-center justify-between mb-4 px-1">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">History</h2>
+          <div class="flex gap-2">
+             <button id="exportBtn" class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Export CSV">
+                <i data-lucide="download" class="w-4 h-4"></i>
+             </button>
+             <button id="clearBtn" class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Clear All">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+             </button>
+          </div>
+        </div>
          
          <!-- Chart -->
          <div class="bg-white dark:bg-slate-850 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
@@ -119,19 +133,7 @@
          </div>
       </section>
 
-      <!-- History List -->
-      <section id="historySection" class="hidden animate-slide-up" style="animation-delay: 150ms;">
-        <div class="flex items-center justify-between mb-4 px-1">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white">History</h2>
-          <div class="flex gap-2">
-             <button id="exportBtn" class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Export CSV">
-                <i data-lucide="download" class="w-4 h-4"></i>
-             </button>
-             <button id="clearBtn" class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Clear All">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-             </button>
-          </div>
-        </div>
+      
         
         <div class="bg-white dark:bg-slate-850 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <table class="w-full text-left border-collapse">
