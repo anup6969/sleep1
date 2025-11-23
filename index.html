@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SleepLog AI</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              slate: { 850: '#151f32', 900: '#0f172a', 950: '#020617' },
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'slide-up': 'slideUp 0.5s ease-out',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+            keyframes: {
+              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+              slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+            }
+          },
+        },
+      }
+    </script>
+    
+    <!-- Chart.js and Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Import Map for Google GenAI SDK -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+      }
+    }
+    </script>
+
+    <style>
+      body { background-color: #f8fafc; color: #0f172a; }
+      .dark body { background-color: #020617; color: #f1f5f9; }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .dark ::-webkit-scrollbar-thumb { background: #334155; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-900 transition-colors duration-300 min-h-screen pb-12">
+    
+    <!-- App Container -->
+    <div id="app" class="max-w-md mx-auto px-4 py-6 space-y-8">
+      
+      <!-- Header -->
+      <header class="flex items-center justify-between mb-8 animate-fade-in">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-500/20">
+            <i data-lucide="moon" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+             <h1 class="text-xl font-bold text-gray-900 dark:text-white leading-tight">SleepLog</h1>
+             <p id="greeting" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Loading...</p>
+          </div>
+        </div>
+        <button id="themeToggle" class="p-2.5 rounded-full bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 transition-all shadow-sm">
+          <i data-lucide="sun" id="themeIcon" class="w-5 h-5"></i>
+        </button>
+      </header>
+
+      <!-- Main Record Button -->
+      <section class="flex flex-col items-center justify-center py-4 animate-slide-up">
+        <button id="recordBtn" class="group relative flex flex-col items-center justify-center w-72 h-72 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white rounded-full shadow-2xl transition-all duration-300 transform hover:scale-[1.02] active:scale-95 ring-8 ring-indigo-100 dark:ring-indigo-900/30">
+          <div class="absolute inset-0 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div class="z-10 flex flex-col items-center">
+             <i data-lucide="plus" class="w-16 h-16 mb-4 opacity-80 group-hover:rotate-90 transition-transform duration-300"></i>
+             <span class="text-2xl font-black tracking-widest">RECORD</span>
+             <span class="text-2xl font-light tracking-widest opacity-90">SLEEP</span>
+             <span class="text-xs font-medium text-indigo-100 bg-indigo-700/50 px-3 py-1 rounded-full mt-4 group-hover:bg-indigo-600/50 transition-colors">Tap to log now</span>
+          </div>
+        </button>
+      </section>
+
+      <!-- AI & Charts Section (Hidden if no data) -->
+      <section id="insightsSection" class="hidden space-y-6 animate-slide-up">
+         
+         <!-- Chart -->
+         <div class="bg-white dark:bg-slate-850 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+               <h3 class="text-sm font-bold text-gray-800 dark:text-white uppercase tracking-wider">Recent Trend</h3>
+               <span class="text-[10px] font-bold px-2 py-1 bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-gray-400 rounded-md">LAST 14 DAYS</span>
+            </div>
+            <div class="relative h-48 w-full">
+               <canvas id="sleepChart"></canvas>
+            </div>
+         </div>
+
+         <!-- AI Analysis -->
+         <div class="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-slate-800 dark:to-slate-900 p-6 rounded-2xl border border-indigo-100 dark:border-slate-700/50">
+            <div class="flex items-center justify-between mb-4">
+               <h3 class="text-sm font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                 <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i>
+                 AI Insights
+               </h3>
+               <button id="analyzeBtn" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors shadow-sm shadow-indigo-200 dark:shadow-none">
+                 Analyze
+               </button>
+            </div>
+
+            <!-- AI Loading -->
+            <div id="aiLoading" class="hidden flex flex-col items-center justify-center py-6 text-indigo-600 dark:text-indigo-400 animate-pulse">
+               <i data-lucide="loader-2" class="w-6 h-6 animate-spin mb-2"></i>
+               <span class="text-xs font-bold uppercase tracking-wide">Analyzing Patterns...</span>
+            </div>
+
+            <!-- AI Content -->
+            <div id="aiContent" class="hidden space-y-4">
+               <div class="bg-white/60 dark:bg-slate-900/50 p-4 rounded-xl border border-indigo-50 dark:border-slate-700/50">
+                  <p id="aiAnalysisText" class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed"></p>
+               </div>
+               <div id="aiRecommendations" class="space-y-2">
+                  <!-- Injected via JS -->
+               </div>
+            </div>
+            
+            <!-- AI Error -->
+            <div id="aiError" class="hidden p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-xs rounded-lg border border-red-100 dark:border-red-900/30"></div>
+         </div>
+      </section>
+
+      <!-- History List -->
+      <section id="historySection" class="hidden animate-slide-up" style="animation-delay: 150ms;">
+        <div class="flex items-center justify-between mb-4 px-1">
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white">History</h2>
+          <div class="flex gap-2">
+             <button id="exportBtn" class="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Export CSV">
+                <i data-lucide="download" class="w-4 h-4"></i>
+             </button>
+             <button id="clearBtn" class="p-2 text-gray-400 hover:text-red-600 transition-colors" title="Clear All">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+             </button>
+          </div>
+        </div>
+        
+        <div class="bg-white dark:bg-slate-850 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-gray-800">
+              <tr>
+                <th class="px-5 py-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Day</th>
+                <th class="px-5 py-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="px-5 py-3 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-right">Time</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody" class="divide-y divide-gray-100 dark:divide-gray-800">
+              <!-- Rows injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-600 animate-fade-in">
+          <i data-lucide="clock" class="w-12 h-12 mb-3 opacity-20"></i>
+          <p class="text-sm font-medium">No sleep records yet.</p>
+      </div>
+
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script type="module">
+      import { GoogleGenAI, Type } from "@google/genai";
+
+      // --- STATE & CONFIG ---
+      let records = [];
+      let chartInstance = null;
+      let isDark = false;
+      const STORAGE_KEY = 'sleepRecords';
+      const THEME_KEY = 'darkMode';
+
+      // --- INITIALIZATION ---
+      window.addEventListener('load', () => {
+        initializeTheme();
+        loadRecords();
+        updateGreeting();
+        
+        // Initialize Icons
+        if (window.lucide) window.lucide.createIcons();
+        
+        // Event Listeners
+        document.getElementById('recordBtn').addEventListener('click', recordSleep);
+        document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+        document.getElementById('clearBtn').addEventListener('click', clearRecords);
+        document.getElementById('exportBtn').addEventListener('click', exportCSV);
+        document.getElementById('analyzeBtn').addEventListener('click', analyzeSleep);
+      });
+
+      // --- THEME HANDLING ---
+      function initializeTheme() {
+        const stored = localStorage.getItem(THEME_KEY);
+        // Default to dark mode if not set, or prefer-color-scheme
+        if (stored) {
+            isDark = JSON.parse(stored);
+        } else {
+            isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        }
+        applyTheme();
+      }
+
+      function toggleTheme() {
+        isDark = !isDark;
+        localStorage.setItem(THEME_KEY, JSON.stringify(isDark));
+        applyTheme();
+      }
+
+      function applyTheme() {
+        const html = document.documentElement;
+        const icon = document.getElementById('themeIcon');
+        
+        if (isDark) {
+          html.classList.add('dark');
+          if (icon) icon.setAttribute('data-lucide', 'sun');
+        } else {
+          html.classList.remove('dark');
+          if (icon) icon.setAttribute('data-lucide', 'moon');
+        }
+        
+        if (window.lucide) window.lucide.createIcons();
+        if (chartInstance) renderChart(); // Re-render chart for colors
+      }
+
+      function updateGreeting() {
+        const hour = new Date().getHours();
+        let greeting = 'GOOD EVENING';
+        if (hour < 12) greeting = 'GOOD MORNING';
+        else if (hour < 18) greeting = 'GOOD AFTERNOON';
+        document.getElementById('greeting').textContent = greeting;
+      }
+
+      // --- DATA HANDLING ---
+      function loadRecords() {
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          records = stored ? JSON.parse(stored) : [];
+        } catch (e) {
+          console.error("Load failed", e);
+          records = [];
+        }
+        renderApp();
+      }
+
+      function saveRecords() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+        renderApp();
+      }
+
+      function recordSleep() {
+        const now = new Date();
+        
+        // Formats
+        const day = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(now);
+        const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(now);
+        const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }); // 1:52 AM
+        const time24 = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); // 01:52 (for graph logic)
+
+        const newRecord = {
+          id: crypto.randomUUID(),
+          timestamp: now.getTime(),
+          day,
+          date,
+          time,
+          time24 
+        };
+
+        records.unshift(newRecord); // Add to top
+        saveRecords();
+        
+        // Haptic feedback if available on mobile
+        if (navigator.vibrate) navigator.vibrate(50);
+      }
+
+      function clearRecords() {
+        if (confirm("Delete all sleep records?")) {
+          records = [];
+          saveRecords();
+          // Hide AI specific elements immediately
+          document.getElementById('aiContent').classList.add('hidden');
+          document.getElementById('aiAnalysisText').textContent = '';
+        }
+      }
+
+      function exportCSV() {
+        if(records.length === 0) return;
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + "Day,Date,Time\n"
+          + records.map(r => `${r.day},${r.date},${r.time}`).join("\n");
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "sleep_log.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // --- RENDERING ---
+      function renderApp() {
+        const hasRecords = records.length > 0;
+        const hasEnoughForChart = records.length > 1;
+        
+        document.getElementById('historySection').classList.toggle('hidden', !hasRecords);
+        document.getElementById('emptyState').classList.toggle('hidden', hasRecords);
+        document.getElementById('insightsSection').classList.toggle('hidden', !hasEnoughForChart);
+        
+        renderList();
+        if (hasEnoughForChart) renderChart();
+      }
+
+      function renderList() {
+        const tbody = document.getElementById('historyBody');
+        tbody.innerHTML = '';
+        
+        records.forEach(record => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors group';
+          tr.innerHTML = `
+            <td class="px-5 py-4 text-sm font-medium text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">${record.day}</td>
+            <td class="px-5 py-4 text-sm text-gray-600 dark:text-gray-300">${record.date}</td>
+            <td class="px-5 py-4 text-sm font-mono font-medium text-indigo-600 dark:text-indigo-400 text-right">${record.time}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderChart() {
+        const canvas = document.getElementById('sleepChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        
+        if (chartInstance) chartInstance.destroy();
+
+        // Data Prep: Take last 14, reverse to chronological
+        const chartData = [...records].slice(0, 14).reverse().map(r => {
+          // Parse time24 (HH:mm)
+          const [h, m] = r.time24.split(':').map(Number);
+          // Normalize: if hour < 12 (e.g. 1 AM), treat as 25 (24+1) so it graphs 'above' 23 PM.
+          const val = (h < 12 ? h + 24 : h) + (m / 60);
+          return { label: r.date.split(' ').slice(0, 2).join(' '), value: val, raw: r.time };
+        });
+
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+        const accentColor = '#6366f1'; // Indigo 500
+
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: chartData.map(d => d.label),
+            datasets: [{
+              data: chartData.map(d => d.value),
+              borderColor: accentColor,
+              backgroundColor: isDark ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.1)',
+              borderWidth: 3,
+              pointBackgroundColor: isDark ? '#1e293b' : '#ffffff',
+              pointBorderColor: accentColor,
+              pointRadius: 4,
+              tension: 0.4,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: { label: (c) => 'Time: ' + chartData[c.dataIndex].raw }
+              }
+            },
+            scales: {
+              y: {
+                grid: { color: gridColor },
+                ticks: {
+                  color: textColor,
+                  font: { size: 10 },
+                  callback: (v) => {
+                    const h = Math.floor(v);
+                    const m = Math.round((v - h) * 60);
+                    const dh = h >= 24 ? h - 24 : h;
+                    return `${dh.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                  }
+                }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: textColor, font: { size: 10 } }
+              }
+            }
+          }
+        });
+      }
+
+      // --- GENAI INTEGRATION ---
+      async function analyzeSleep() {
+        const loadingEl = document.getElementById('aiLoading');
+        const contentEl = document.getElementById('aiContent');
+        const errorEl = document.getElementById('aiError');
+        const btn = document.getElementById('analyzeBtn');
+
+        loadingEl.classList.remove('hidden');
+        contentEl.classList.add('hidden');
+        errorEl.classList.add('hidden');
+        btn.disabled = true;
+
+        try {
+          // IMPORTANT: Access API Key from env
+          const apiKey = process.env.API_KEY;
+          if (!apiKey) throw new Error("Missing API_KEY in environment");
+
+          // Prepare data
+          const recent = records.slice(0, 20).map(r => `${r.day} ${r.date}: ${r.time}`).join('\n');
+          const prompt = `
+            Analyze these sleep times:
+            ${recent}
+            
+            1. Brief analysis of consistency.
+            2. Three short bullet point recommendations.
+          `;
+
+          const ai = new GoogleGenAI({ apiKey });
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  analysis: { type: Type.STRING },
+                  recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ["analysis", "recommendations"]
+              }
+            }
+          });
+
+          const result = JSON.parse(response.text);
+
+          // Render
+          document.getElementById('aiAnalysisText').textContent = result.analysis;
+          const recList = document.getElementById('aiRecommendations');
+          recList.innerHTML = '';
+          result.recommendations.forEach(rec => {
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-2 text-xs font-medium text-gray-600 dark:text-gray-400';
+            div.innerHTML = `<i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0"></i> <span>${rec}</span>`;
+            recList.appendChild(div);
+          });
+          
+          if (window.lucide) window.lucide.createIcons();
+          contentEl.classList.remove('hidden');
+
+        } catch (err) {
+          console.error(err);
+          errorEl.textContent = "AI Analysis failed. Please try again.";
+          errorEl.classList.remove('hidden');
+        } finally {
+          loadingEl.classList.add('hidden');
+          btn.disabled = false;
+        }
+      }
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
